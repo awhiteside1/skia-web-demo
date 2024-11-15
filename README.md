@@ -1,50 +1,93 @@
-# Welcome to your Expo app 👋
+# Native Skia Example Repo
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+## Purpose
 
-## Get started
+Minimal example to validate issues when using skia on web, in particular `Skia.Surface.MakeOffscreen()`, despite the
+same usage working fine on native. Each variant draws the same image using a slightly different approach to rule out
+other issues.
 
-1. Install dependencies
+### Motivation
 
-   ```bash
-   npm install
-   ```
+In another app, I'm using user input to draw on the canvas, clipped by a mask that's generated from the underlying image
+based on what region they started drawing in. Currently, this is an Image that's masking (so using layers), but it seems
+to work fine incrementally as the user adds paths.
 
-2. Start the app
+The problem is when the user loads a previous image with many layers, and the app rebuilds the canvas layer by layer
+masking and drawing (since i'm storing only the path data as the mask can be derived). Using an offscreen surface / the
+GPU is orders of magnitude faster than an CPU based surface (cause duh), however when I try to render an image created
+from an offscreen surface on web, I get a white screen. The same code works fine on native.
 
-   ```bash
-    npx expo start
-   ```
+My current workaround is to initialize the surface differently based on the platform, but it's not really viable. The alternatives I have are 
+- Trace the masks serverside so I can remove the bitmap masking that makes the CPU too slow
+- Try rending to canvas kit directly
+- Get better at shaders and composite the mask there
 
-In the output, you'll find options to open the app in a
+## Goal
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+- Create an offscreen canvas
+    - `const surface = Skia.Surface.MakeOffscreen()`
+- Which can be drawn to by iteration over some data
+    - `data.map(layer=> surface.canvas.drawImage(layer))`
+    - in reality there are multiple operations happening per layer
+- And can produce an image composing all layers
+    - `const mergedImage = surface.makeImageSnapshot()`
+- Which can be displayed on the primary canvas
+    - `<Canvas><Image image={mergedImage}/></Canvas>`
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+### Variants Tested
 
-## Get a fresh project
+| Number | Description                                     | Problems               |
+|--------|-------------------------------------------------|------------------------|
+| 1      | uses drawAsImage() base case                    |                        |
+| 2      | creates an offscreen surface per operation      | Does not render on web |
+| 3      | creates a CPU surface per operation             | Slow                   |
+| 4      | creates a single CPU surface which is reused    | Still Slow             |
+| 5      | creates a single offscreen surface, then reused | Does not render on web |
 
-When you're ready, run:
+### Created From
 
-```bash
-npm run reset-project
+1. `npx create-expo-app@latest SkiaExample`
+2. `npx expo install @shopify/react-native-skia` + Web Canvas Setup
+3. Added Examples to `(tabs)/index.tsx`
+    4. Component code is all in `components/skia`
+
+### Current Behavior
+
+| iOS                                                                                           | Android                                                                                       |
+|-----------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------|
+| <img src="https://i.imgur.com/Uef0u25.png" style="max-height: 400px; display: inline-block;"> | <img src="https://i.imgur.com/yH5gi2L.png" style="max-height: 400px; display: inline-block;"> |
+
+| Web                                 (Arc/Chrome OSX M2 Max)           |
+|-----------------------------------------------------------------------|
+| <img src="https://i.imgur.com/9s8hCZZ.png" style="max-width: 600px" > | 
+ 
+## Other Misc. Things I've tried
+
+### Continuous Mode 
+
+Doesnt seem to have any effect (not that I'd expect it to given updates are actively invoked)
+
+### Change which thread the surface is created on
+
+I.e. Create on the JS Thread
+```ts
+const surface = useSharedValue(Skia.Surface.MakeOffscreen())
+     // ... later in an effect
+runOnUI(someWorklet)({surface})
+```
+vs create on UI Thread
+
+```ts
+const someWorklet = ()=>{
+    "worklet"
+  const surface = Skia.Surface.MakeOffscreen()
+}
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+This doesnt seem to matter in any case - it neither breaks CPU surfaces, nor fixes GPU surfaces, which probably means those calls invoke the backend on the right thread explicitly, then its just a pointer being passed by reanimated. 
 
-## Learn more
 
-To learn more about developing your project with Expo, look at the following resources:
+### Debugged the MakeOffscreen function 
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+As far as I can tell it follows the happy path all the way, and works up until snapshotting the image. 
 
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
