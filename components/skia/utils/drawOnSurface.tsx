@@ -23,8 +23,9 @@ export const drawOnSurface = ({
   if (modifier) modifier(canvas);
   canvas.drawImage(source, 0, 0);
   canvas.restore();
+  surface?.flush();
   const newImage = surface?.makeImageSnapshot();
   if (!newImage) throw new Error("Could not save image");
-  target.set(newImage);
+  target.set(newImage.makeNonTextureImage());
   console.log(` ✅ Created Image using ${method}`);
 };

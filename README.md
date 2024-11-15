@@ -91,3 +91,11 @@ This doesnt seem to matter in any case - it neither breaks CPU surfaces, nor fix
 
 As far as I can tell it follows the happy path all the way, and works up until snapshotting the image. 
 
+### Calling makeNonTextureImage() after generating the image
+
+Based on https://sourcegraph.com/github.com/Shopify/react-native-skia@main/-/blob/packages/skia/src/renderer/Offscreen.tsx?L43-45
+
+ANNNDDDDD IT LIVES!
+
+
+

@@ -1,6 +1,6 @@
 import {
-  drawAsImage,
   Image,
+  ImageFormat,
   SkCanvas,
   Skia,
   SkImage,
@@ -16,6 +16,7 @@ import {
 } from "../utils";
 
 import { SyncedCanvas } from "@/components/skia/GlobalOptions";
+import { Button } from "react-native";
 
 interface SurfaceDrawer {
   target: SharedValue<SkImage | null>;
@@ -41,7 +42,7 @@ export const DrawOnSurfaceOffscreen = ({ children }: PropsWithChildren) => {
   useEffect(() => {
     runOnUI(draw)({
       target: image,
-      source: drawAsImage(<>{children}</>, { width: 256, height: 256 }),
+      source: original,
     });
   }, [children]);
   useRotationEffect((modifier) => {
@@ -57,6 +58,14 @@ export const DrawOnSurfaceOffscreen = ({ children }: PropsWithChildren) => {
       <SyncedCanvas>
         <Image image={image} rect={imageRect} />
       </SyncedCanvas>
+      <Button
+        onPress={() => {
+          const pixels = image.get()?.makeNonTextureImage().readPixels();
+          const base = image.value?.encodeToBase64(ImageFormat.PNG);
+          console.log(base?.substring(0, 100));
+        }}
+        title="Log"
+      ></Button>
     </Container>
   );
 };

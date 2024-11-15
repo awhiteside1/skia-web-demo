@@ -18,7 +18,9 @@ export const useSurface = (
       factory(surface);
     }
     return () => {
-      surface.value?.dispose();
+      if (surface.value) {
+        surface.value?.dispose();
+      }
     };
   }, []);
   return surface;
